@@ -1,14 +1,32 @@
 /*
+ * PLAYMID. ESXDOS command to play MIDI files in a ZX Spectrum 128K computer
+ * Copyright (C) 2019 Miguel Angel Rodriguez Jodar
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
 Compilar con:
 sdcc -mz80 --reserve-regs-iy --opt-code-size --max-allocs-per-node 10000 ^
 --nostdlib --nostdinc --no-std-crt0 --code-loc 0x2000 --data-loc 0x2b00 playmid.c z80.lib -L "C:\Program Files\SDCC\lib\z80"
 makebin -s 65535 -p playmid.ihx playmid.bin
 dd if=playmid.bin of=PLAYMID bs=1 skip=8192
 
-OJO con --data-loc. Ahora mismo hay un margen de unos 180 bytes entre el final del códdigo (sin librerías) y el valor
-que se indica en --data-loc. Si el código de este programa crece, habría que mover --data-loc adecuadamente para que no se
-solapen. Ojala encuentre una forma de evitar esto y que los datos, sencillamente, se pongan al final de todo el código, o
-entre mi código y las librerías, sin tener que especificar nada.
+OJO con --data-loc. Ahora mismo hay un margen de unos 180 bytes entre el final del cÃ³ddigo (sin librerÃ­as) y el valor
+que se indica en --data-loc. Si el cÃ³digo de este programa crece, habrÃ­a que mover --data-loc adecuadamente para que no se
+solapen. Ojala encuentre una forma de evitar esto y que los datos, sencillamente, se pongan al final de todo el cÃ³digo, o
+entre mi cÃ³digo y las librerÃ­as, sin tener que especificar nada.
 
 */
 
@@ -74,19 +92,19 @@ __sfr __banked __at (0xfd3b) ZXUNODATA;
 
 BYTE errno;
 
-// Esta precisión la he elegido suponiendo que ppq nunca será mayor en la práctica de 2048, para que no 
+// Esta precisiÃ³n la he elegido suponiendo que ppq nunca serÃ¡ mayor en la prÃ¡ctica de 2048, para que no 
 // desborde en 32 bits al calcular el valor de ticks_per_int en un evento FF 03 58
 #define PRECISION 64
 
 // variables globales en lugar de locales para agilizar su lectura, y no depender de direccionamiento indexado
-// que engordaría y enlentecería (más aún) el programa
+// que engordarÃ­a y enlentecerÃ­a (mÃ¡s aÃºn) el programa
 
 BYTE formato;  // formato del fichero MIDI: 0, 1 o 2. En realidad esta variable es un poco superflua.
 BYTE i, c;     // contadores de bucle, etc.
 BYTE status;   // byte de estado del evento MIDI
 BYTE param1, param2;  // bytes de parametros opcionales para el estado
 BYTE running_status;  // a 1 si el evento actual no tiene estado.
-DWORD ppq, delta, delta_ints, ticks_per_int, tick;  // variables que se usan para calcular el tempo de la melodía
+DWORD ppq, delta, delta_ints, ticks_per_int, tick;  // variables que se usan para calcular el tempo de la melodÃ­a
 __at(0x3000) BYTE buffer[1024];  // Buffer de 1KB para guardar eventos MIDI. No moverlo de aqui sin tocar SendMIDI
 WORD pos, ppos, leido, lbytes;   // variables para movernos por el buffer. ppos se usa para saber si hemos pasado de una mitad a otra del buffer
 DWORD us_per_quarter;    // ultimo tempo leido con el metaevento Set Tempo
@@ -116,8 +134,8 @@ int cmp4b (BYTE *a, BYTE *b);
 void SendMIDI (BYTE *ev, BYTE lev);
 void SendMIDIByte (void) __naked;
 
-// Rutina inicial. Debe ser el primer código que se encuentre en el fichero. Esta inicialización
-// está pensada para ser usada con ficheros .command de ESXDOS.
+// Rutina inicial. Debe ser el primer cÃ³digo que se encuentre en el fichero. Esta inicializaciÃ³n
+// estÃ¡ pensada para ser usada con ficheros .command de ESXDOS.
 void init (void) __naked
 {
      __asm
@@ -147,7 +165,7 @@ BYTE main (char *p)
 
   // GM MIDI Reset
   WAIT_VRETRACE;
-  comando = 0xFF;   // envío el comando FF para resetear el MIDI
+  comando = 0xFF;   // envÃ­o el comando FF para resetear el MIDI
   SendMIDI (&comando, 1);
 
   // Si no hay fichero para abrir, mostrar ayuda
@@ -161,7 +179,7 @@ BYTE main (char *p)
 
   // GM MIDI Reset
   WAIT_VRETRACE;
-  comando = 0xFF;   // envío el comando FF para resetear el MIDI
+  comando = 0xFF;   // envÃ­o el comando FF para resetear el MIDI
   SendMIDI (&comando, 1);
 
   return res;
@@ -195,7 +213,7 @@ void usage (void)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Rutina principal de reproducción MIDI
+// Rutina principal de reproducciÃ³n MIDI
 void playmidi (BYTE f)
 {
     // Leemos los primeros 512 bytes del fichero, en donde se encuentra la cabecera MIDI (14 bytes)
@@ -208,7 +226,7 @@ void playmidi (BYTE f)
         return;
     }
 
-    // Leemos el formato del fichero. Sólo aceptamos formato 0
+    // Leemos el formato del fichero. SÃ³lo aceptamos formato 0
     formato = buffer[9];
     if (formato != 0)
     {
@@ -220,13 +238,13 @@ void playmidi (BYTE f)
     ppq = buffer[12]<<8 | buffer[13];
 
     //ticks_per_quarter = <PPQ from the header>
-    //µs_per_quarter = <Tempo in latest Set Tempo event>
-    //µs_per_tick = µs_per_quarter / ticks_per_quarter
-    //seconds_per_tick = µs_per_tick / 1.000.000
+    //Âµs_per_quarter = <Tempo in latest Set Tempo event>
+    //Âµs_per_tick = Âµs_per_quarter / ticks_per_quarter
+    //seconds_per_tick = Âµs_per_tick / 1.000.000
     //seconds = ticks * seconds_per_tick
 
-    // calculamos el numero de ticks MIDI que hay en una interrupción del Spectrum (20ms)
-    // Este cálculo es distinto dependiendo del bit 7 del byte 12 de la cabecera
+    // calculamos el numero de ticks MIDI que hay en una interrupciÃ³n del Spectrum (20ms)
+    // Este cÃ¡lculo es distinto dependiendo del bit 7 del byte 12 de la cabecera
     if (buffer[12]&0x80)
     {
         buffer[12] &= 0x7F;
@@ -237,14 +255,14 @@ void playmidi (BYTE f)
         ticks_per_int = PRECISION * 20 * ppq / 500;
     }
 
-    // Comprobamos que realmente es una pista MIDI, y si no es así, retornamos con error.
+    // Comprobamos que realmente es una pista MIDI, y si no es asÃ­, retornamos con error.
     if (cmp4b (buffer+14, "MTrk") == 0)
     {
         puts ("MTrk chunk expected\xd");
         return;
     }
 
-    // A partir de aquí, lo que hay en el MIDI son eventos.
+    // A partir de aquÃ­, lo que hay en el MIDI son eventos.
     pos = 22;   // nos situamos al comienzo del primer evento de la pista
     ppos = 512; // forzamos a que se vaya leyendo la segunda mitad del buffer
     tick = 0;
@@ -279,9 +297,9 @@ void playmidi (BYTE f)
         // Si delta especifica un tiempo superior a 0...
         if (delta)
         {
-           // ajustamos delta segun la precisión (aritmética de punto fijo)
+           // ajustamos delta segun la precisiÃ³n (aritmÃ©tica de punto fijo)
            delta *= PRECISION;
-           // cada interrupción dura ticks_per_int ticks de reloj MIDI. Con este bucle esperamos un
+           // cada interrupciÃ³n dura ticks_per_int ticks de reloj MIDI. Con este bucle esperamos un
            // numero de interrupciones que sea igual o algo mayor al que dicte el numero de ticks en delta.
            while (tick < delta)
            {
@@ -290,7 +308,7 @@ void playmidi (BYTE f)
                WAIT_VRETRACE;
                tick += ticks_per_int;
            }
-           tick -= delta;  // ajustamos tick por si hemos esperado más de la cuenta (para compensar)
+           tick -= delta;  // ajustamos tick por si hemos esperado mÃ¡s de la cuenta (para compensar)
         }
         // si lo que hay tras el delta es un byte de estado (con bit 7=1), entonces cancelamos running status
         if (buffer[pos] & 0x80)
@@ -298,10 +316,10 @@ void playmidi (BYTE f)
             running_status = 0;
             status = buffer[pos];
         }
-        else // per si no, entonces status no se actualiza y señalamos que hay running status
+        else // per si no, entonces status no se actualiza y seÃ±alamos que hay running status
             running_status = 1;
 
-        // ahora, según el valor de status, estamos ante un evento u otro. Los procesamos.
+        // ahora, segÃºn el valor de status, estamos ante un evento u otro. Los procesamos.
         
         // EVENTOS F0 y F7. Se usan para enviar SYSEX y datos arbitrarios al secuenciador. Los pasmos tal cual.
         if (status == 0xF0 || status == 0xF7)
@@ -330,7 +348,7 @@ void playmidi (BYTE f)
         }
 
         // EVENTOS 8n, 9n, An, Bm, Cn, Dn, En y Fn. Si es alguno de estos, se envia el evento MIDI asociado.
-        // En estos eventos se ha de tener en cuenta el running status para enviar 1, 2 o 3 bytes según sea el caso.
+        // En estos eventos se ha de tener en cuenta el running status para enviar 1, 2 o 3 bytes segÃºn sea el caso.
         c = (status>>4) & 0xF;
         if (c == 0x8 || c == 0x9 || c == 0xA || c == 0xB || c == 0xE)
         {
@@ -361,8 +379,8 @@ void playmidi (BYTE f)
             continue;
         }
 
-        // EVENTOS que necesitan un primer parámetro
-        // estos eventos serán ignorados
+        // EVENTOS que necesitan un primer parÃ¡metro
+        // estos eventos serÃ¡n ignorados
         pos = (pos + 1) & 0x3FF;
         param1 = buffer[pos];
         if (status == 0xFF && ((param1 >= 0x01 && param1 <= 0x07) || param1 == 0x7F))
@@ -381,12 +399,12 @@ void playmidi (BYTE f)
             continue;
         }
 
-        // EVENTOS que necesitan un segundo parámetro
+        // EVENTOS que necesitan un segundo parÃ¡metro
         pos = (pos + 1) & 0x3FF;
         param2 = buffer[pos];
         if (status == 0xFF)
         {
-            if (param1 == 0x2F && param2 == 0x00)  // Meta evento de FIN DE PISTA. Terminar con el bucle de reproducción
+            if (param1 == 0x2F && param2 == 0x00)  // Meta evento de FIN DE PISTA. Terminar con el bucle de reproducciÃ³n
                 break;
             if (param1 == 0x51 && param2 == 0x03)  // Meta evento Set Tempo.
             {
@@ -399,7 +417,7 @@ void playmidi (BYTE f)
                 pos = (pos + 1) & 0x3FF;
                 ticks_per_int = PRECISION * 20000L * ppq / us_per_quarter;  // y calculamos el nuevo valor de ticks_per_int
             }
-            // El resto de meta eventos se ignora. No sé si hago bien en ignorarlos todos, pero de momento, parece que ningún MIDI se ha quejado
+            // El resto de meta eventos se ignora. No sÃ© si hago bien en ignorarlos todos, pero de momento, parece que ningÃºn MIDI se ha quejado
             if (param1 == 0x00 && param2 == 0x02)
             {
                 pos = (pos + 3) & 0x3FF;
@@ -447,7 +465,7 @@ void SendMIDI (BYTE *ev, BYTE lev)
 {
   BYTE d;
 
-  // Si estamos en el ZXUNO, esta operación debe hacerse a la velocidad estándar (3.5 MHz)
+  // Si estamos en el ZXUNO, esta operaciÃ³n debe hacerse a la velocidad estÃ¡ndar (3.5 MHz)
   ZXUNOADDR = 0xb;
   d = ZXUNODATA;
   ZXUNODATA = d & 0x3F;
@@ -482,8 +500,8 @@ buc_send_midi:
 }
 
 // Esta es una copia total de la rutina de la ROM 1 del 128K para enviar un byte MIDI.
-// El fuente proviene del desensamble que está en la página de Paul Farrow. Si hubiera problemas con este cachito de código
-// lo reescribiré.
+// El fuente proviene del desensamble que estÃ¡ en la pÃ¡gina de Paul Farrow. Si hubiera problemas con este cachito de cÃ³digo
+// lo reescribirÃ©.
 void SendMIDIByte (void) __naked
 {
   __asm
@@ -554,7 +572,7 @@ __endasm;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// Copia desde una posición de memoria, los bytes que forman el nombre de un fichero hasta encontrar un espacio,
+// Copia desde una posiciÃ³n de memoria, los bytes que forman el nombre de un fichero hasta encontrar un espacio,
 // un retorno de linea, o el simbolo de los dos puntos ":" para indicar fin de una sentencia. Se usa en ESXDOS
 void getfilename (char *p, char *fname)
 {
@@ -643,8 +661,8 @@ void print16bhex (WORD n)
     puts(s);
 }
 
-// Codigo necesario como prologo de cualquier función C. No se aplica a las __naked.
-// Como no estoy incluyendo las librerias estándar ni el crt0 estándar, he de ponerla aqui
+// Codigo necesario como prologo de cualquier funciÃ³n C. No se aplica a las __naked.
+// Como no estoy incluyendo las librerias estÃ¡ndar ni el crt0 estÃ¡ndar, he de ponerla aqui
 void __sdcc_enter_ix (void) __naked
 {
     __asm
@@ -657,7 +675,7 @@ void __sdcc_enter_ix (void) __naked
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-// RUTINAS ESXDOS (sólo las que necesito en este programa, por lo que no están ni seek ni write
+// RUTINAS ESXDOS (sÃ³lo las que necesito en este programa, por lo que no estÃ¡n ni seek ni write
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 BYTE open (char *filename, BYTE mode)
